@@ -41,5 +41,6 @@ def resolve_flag(flag_id: int, body: schemas.FlagResolve, session: Session = Dep
         raise HTTPException(422, "Unknown provider_id")
     flag.resolved_at = utcnow()
     flag.resolved_by = body.provider_id
+    flag.resolution = "provider"
     session.commit()
     return flag

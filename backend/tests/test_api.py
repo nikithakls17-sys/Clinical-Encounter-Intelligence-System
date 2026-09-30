@@ -5,7 +5,7 @@ from app.models import utcnow
 def _add_flag(session, patient_id=1, encounter_id=1, severity=models.Severity.HIGH):
     flag = models.AnomalyFlag(
         patient_id=patient_id, encounter_id=encounter_id, flag_type=models.FlagType.MED_INTERACTION,
-        severity=severity, rule_id="test", message="warfarin + ibuprofen",
+        severity=severity, rule_id="test", fingerprint="ibuprofen|warfarin", message="warfarin + ibuprofen",
     )
     session.add(flag)
     session.commit()

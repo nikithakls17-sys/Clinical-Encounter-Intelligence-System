@@ -249,13 +249,19 @@ class AnomalyFlag(Base):
     flag_type: Mapped[FlagType] = mapped_column(_enum(FlagType, "flag_type"))
     severity: Mapped[Severity] = mapped_column(_enum(Severity, "severity"))
     rule_id: Mapped[str] = mapped_column(String(60))
+    # Identifies the underlying condition (e.g. "ibuprofen|warfarin") so re-running rules never duplicates a flag.
+    fingerprint: Mapped[str] = mapped_column(String(200))
     message: Mapped[str] = mapped_column(String(300))
     details: Mapped[dict | None] = mapped_column(JSONType)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_by: Mapped[int | None] = mapped_column(ForeignKey("providers.id"))
+    resolution: Mapped[str | None] = mapped_column(String(20))  # "provider" or "auto_cleared"
 
-    __table_args__ = (Index("ix_anomaly_flags_open", "patient_id", "resolved_at"),)
+    __table_args__ = (
+        Index("ix_anomaly_flags_open", "patient_id", "resolved_at"),
+        Index("ix_anomaly_flags_fingerprint", "patient_id", "rule_id", "fingerprint"),
+    )
 
 
 # ------------------------------------------------------------------ reference data

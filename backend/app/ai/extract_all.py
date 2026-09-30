@@ -15,6 +15,7 @@ from app.ai.deps import get_retriever
 from app.ai.extraction import extract_encounter
 from app.ai.llm import OpenAIChat
 from app.db import engine
+from app.rules.engine import run_rules
 
 
 def main(limit: int | None) -> None:
@@ -34,6 +35,8 @@ def main(limit: int | None) -> None:
                 continue
             result = s.error or f"{len(s.entities)} entities"
             print(f"encounter {e.id}: suggestion {s.id}, {result}, {s.latency_ms} ms")
+        r = run_rules(session)
+        print(f"rules: flags created={r.created} updated={r.updated} auto_resolved={r.auto_resolved}")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ prompt hash, retrieved context, raw output, and the provider's accept/edit/rejec
 - [x] Database schema and synthetic seed data
 - [x] FastAPI endpoints
 - [x] RAG extraction pipeline
-- [ ] Anomaly rules (drug interactions, allergy conflicts, duplicate therapy, missed follow-ups)
+- [x] Anomaly rules (drug interactions, allergy conflicts, duplicate therapy, missed follow-ups)
 - [ ] React provider dashboard
 - [ ] Audit log review UI
 
@@ -48,6 +48,24 @@ Nothing extracted changes the patient record until a provider reviews it.
 
 Batch mode: `python -m app.ai.extract_all` processes every pending encounter.
 
+## Anomaly rules
+`backend/app/rules/engine.py` is deterministic and rule-based by design, so every flag can be explained.
+
+| Rule | Fires when | Severity |
+|---|---|---|
+| `drug_interaction` | Two current medications form a pair in `drug_interactions` | From the table |
+| `allergy_conflict` | A current medication matches a documented allergy, including cross-reactive drugs (penicillin -> amoxicillin) | High |
+| `duplicate_therapy` | Two drugs from the same therapeutic group (e.g. two NSAIDs) | Moderate |
+| `missed_follow_up` | A follow-up is past due and not completed | Low / moderate / high at 1 / 8 / 31+ days overdue |
+
+The current medication list combines the EHR list with AI-extracted medications that have not been rejected;
+a medication the note says to stop is removed. Pending AI output is included on purpose, so the reviewer sees
+the conflict before accepting it. Every flag records which source each drug came from.
+
+Flags are synced rather than appended: re-running never duplicates a flag, a condition that goes away (suggestion
+rejected, follow-up completed) auto-resolves its flag, and a flag a provider dismissed is not raised again.
+Rules run automatically after each extraction, or on demand with `POST /api/rules/run` / `python -m app.rules.run`.
+
 ## API
 Interactive docs at `http://localhost:8000/docs` once the server is running.
 
@@ -62,6 +80,7 @@ Interactive docs at `http://localhost:8000/docs` once the server is running.
 | POST | `/api/encounters/{id}/extract` | Run RAG extraction; returns the audit record |
 | GET | `/api/flags?resolved=&severity=&flag_type=` | Anomaly flags |
 | POST | `/api/flags/{id}/resolve` | Mark a flag resolved by a provider |
+| POST | `/api/rules/run?patient_id=` | Re-evaluate rules for one patient or all |
 | GET | `/api/suggestions?review_status=` | AI audit log |
 | GET | `/api/suggestions/{id}` | Full audit record: prompt hash, retrieved context, raw and parsed output, review |
 

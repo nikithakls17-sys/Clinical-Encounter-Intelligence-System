@@ -136,6 +136,7 @@ class FlagOut(ORM):
     created_at: datetime
     resolved_at: datetime | None
     resolved_by: int | None
+    resolution: str | None
 
 
 class FlagResolve(BaseModel):

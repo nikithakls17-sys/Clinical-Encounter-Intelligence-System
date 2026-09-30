@@ -8,6 +8,7 @@ from app.ai.extraction import ExtractionConflict, extract_encounter
 from app.ai.llm import LLMClient
 from app.ai.retrieval import Retriever
 from app.db import get_session
+from app.rules.engine import sync_patient_flags
 
 router = APIRouter(prefix="/encounters", tags=["encounters"])
 
@@ -109,4 +110,6 @@ def extract(
         raise HTTPException(409, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"Model call failed: {type(exc).__name__}") from exc
+    if suggestion.error is None:
+        sync_patient_flags(session, encounter.patient)
     return suggestion

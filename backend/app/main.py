@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import dashboard, encounters, flags, patients, suggestions
+from app.routers import dashboard, encounters, flags, patients, rules, suggestions
 
 app = FastAPI(
     title="Clinical Encounter Intelligence System",
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for r in (dashboard, patients, encounters, flags, suggestions):
+for r in (dashboard, patients, encounters, flags, rules, suggestions):
     app.include_router(r.router, prefix="/api")
 
 
