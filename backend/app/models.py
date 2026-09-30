@@ -61,6 +61,7 @@ class ReviewStatus(str, enum.Enum):
     ACCEPTED = "accepted"
     EDITED = "edited"
     REJECTED = "rejected"
+    SUPERSEDED = "superseded"  # replaced by a newer extraction before review
 
 
 class FlagType(str, enum.Enum):
@@ -195,6 +196,7 @@ class AISuggestion(Base):
     retrieved_context: Mapped[list | None] = mapped_column(JSONType)  # RAG chunks given to the model
     raw_output: Mapped[str] = mapped_column(Text)  # verbatim model response
     parsed_output: Mapped[dict | None] = mapped_column(JSONType)  # validated structure, null if parse failed
+    error: Mapped[str | None] = mapped_column(Text)  # API or parse failure; failed calls are logged too
     prompt_tokens: Mapped[int | None] = mapped_column(Integer)
     completion_tokens: Mapped[int | None] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
@@ -265,6 +267,21 @@ class ICD10Code(Base):
     code: Mapped[str] = mapped_column(String(10), primary_key=True)
     description: Mapped[str] = mapped_column(String(255))
     category: Mapped[str] = mapped_column(String(80))
+
+
+class ReferenceEmbedding(Base):
+    """Cached embedding vectors for reference documents used in retrieval."""
+
+    __tablename__ = "reference_embeddings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source: Mapped[str] = mapped_column(String(40))  # e.g. "icd10"
+    ref_id: Mapped[str] = mapped_column(String(40))  # e.g. the ICD-10 code
+    model: Mapped[str] = mapped_column(String(80))
+    content_sha256: Mapped[str] = mapped_column(String(64))  # re-embed when the text changes
+    vector: Mapped[list] = mapped_column(JSONType)
+
+    __table_args__ = (UniqueConstraint("source", "ref_id", "model", name="uq_reference_embeddings"),)
 
 
 class DrugInteraction(Base):

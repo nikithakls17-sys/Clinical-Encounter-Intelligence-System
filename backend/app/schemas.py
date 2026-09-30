@@ -113,6 +113,7 @@ class SuggestionDetail(SuggestionSummary):
     retrieved_context: list | None
     raw_output: str
     parsed_output: dict | None
+    error: str | None
     final_output: dict | None
     reviewer_note: str | None
     prompt_tokens: int | None

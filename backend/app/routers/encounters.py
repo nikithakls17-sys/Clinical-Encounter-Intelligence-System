@@ -3,6 +3,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app import models, schemas
+from app.ai.deps import get_llm, get_retriever
+from app.ai.extraction import ExtractionConflict, extract_encounter
+from app.ai.llm import LLMClient
+from app.ai.retrieval import Retriever
 from app.db import get_session
 
 router = APIRouter(prefix="/encounters", tags=["encounters"])
@@ -69,7 +73,7 @@ def get_encounter(encounter_id: int, session: Session = Depends(get_session)):
     return schemas.EncounterDetail(
         **encounter_summary(e).model_dump(),
         note_text=e.note_text,
-        entities=e.entities,
+        entities=[x for x in e.entities if x.review_status != models.ReviewStatus.SUPERSEDED],
         suggestions=sorted(e.suggestions, key=lambda s: s.created_at, reverse=True),
         follow_ups=sorted(e.follow_ups, key=lambda f: f.due_date),
         flags=flags,
@@ -86,3 +90,23 @@ def create_encounter(body: schemas.EncounterCreate, session: Session = Depends(g
     session.add(encounter)
     session.commit()
     return get_encounter(encounter.id, session)
+
+
+@router.post("/{encounter_id}/extract", response_model=schemas.SuggestionDetail, status_code=201)
+def extract(
+    encounter_id: int,
+    session: Session = Depends(get_session),
+    llm: LLMClient = Depends(get_llm),
+    retriever: Retriever = Depends(get_retriever),
+):
+    """Run RAG extraction on the note. Every call is written to the audit log, including failures."""
+    encounter = session.get(models.Encounter, encounter_id)
+    if encounter is None:
+        raise HTTPException(404, "Encounter not found")
+    try:
+        suggestion = extract_encounter(session, encounter, llm, retriever)
+    except ExtractionConflict as exc:
+        raise HTTPException(409, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"Model call failed: {type(exc).__name__}") from exc
+    return suggestion

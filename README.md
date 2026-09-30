@@ -15,7 +15,7 @@ prompt hash, retrieved context, raw output, and the provider's accept/edit/rejec
 ## Status
 - [x] Database schema and synthetic seed data
 - [x] FastAPI endpoints
-- [ ] RAG extraction pipeline
+- [x] RAG extraction pipeline
 - [ ] Anomaly rules (drug interactions, allergy conflicts, duplicate therapy, missed follow-ups)
 - [ ] React provider dashboard
 - [ ] Audit log review UI
@@ -26,7 +26,27 @@ prompt hash, retrieved context, raw output, and the provider's accept/edit/rejec
 | Clinical | `providers`, `patients`, `allergies`, `encounters`, `patient_medications`, `follow_ups` |
 | AI output | `ai_suggestions` (audit log, one row per model call), `extracted_entities` |
 | Rules | `anomaly_flags` |
-| Reference | `icd10_codes`, `drug_interactions` |
+| Reference | `icd10_codes`, `drug_interactions`, `reference_embeddings` (cached vectors) |
+
+## Extraction pipeline
+`POST /api/encounters/{id}/extract` runs retrieval-augmented extraction on one note
+(`backend/app/ai/extraction.py`):
+
+1. **Retrieve** candidate ICD-10 codes for the note. With an API key this uses OpenAI embeddings
+   (`text-embedding-3-small`, cached in `reference_embeddings` and re-embedded only when a description changes);
+   without one it falls back to BM25. Codes written verbatim in the note are always included.
+2. **Generate** with the OpenAI API in strict JSON-schema mode: symptoms (with negation), medications
+   (dose, frequency, route, and whether this visit starts/continues/changes/stops them) and ICD-10 diagnoses.
+3. **Validate**: Pydantic parses the output; every diagnosis code is checked against the reference table and
+   every extracted span is checked for being grounded in the note text. These checks are stored on each entity
+   so the reviewer can see them.
+4. **Audit**: every call writes an `ai_suggestions` row with model, prompt version, SHA-256 of the exact prompt,
+   retrieved context, raw output, parsed output, token counts, latency and any error, including calls that
+   failed or returned invalid JSON. Re-running extraction marks the previous unreviewed suggestion `superseded`.
+
+Nothing extracted changes the patient record until a provider reviews it.
+
+Batch mode: `python -m app.ai.extract_all` processes every pending encounter.
 
 ## API
 Interactive docs at `http://localhost:8000/docs` once the server is running.
@@ -39,6 +59,7 @@ Interactive docs at `http://localhost:8000/docs` once the server is running.
 | GET | `/api/encounters?status=&patient_id=&provider_id=` | Encounter list |
 | GET | `/api/encounters/{id}` | Note text, extracted entities, AI suggestions, follow-ups, flags |
 | POST | `/api/encounters` | Add a new encounter note |
+| POST | `/api/encounters/{id}/extract` | Run RAG extraction; returns the audit record |
 | GET | `/api/flags?resolved=&severity=&flag_type=` | Anomaly flags |
 | POST | `/api/flags/{id}/resolve` | Mark a flag resolved by a provider |
 | GET | `/api/suggestions?review_status=` | AI audit log |
