@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://ceis:ceis@localhost:5432/ceis"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    cors_origins: list[str] = ["http://localhost:5173"]  # Vite dev server
 
 
 settings = Settings()

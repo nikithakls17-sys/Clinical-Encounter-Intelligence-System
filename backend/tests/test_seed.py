@@ -1,25 +1,10 @@
 import re
-from datetime import date
 
-import pytest
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app import models
-from app.db import Base
 from app.seed import data
-from app.seed.seed import load
-
-TODAY = date(2026, 9, 30)
-
-
-@pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
-    Base.metadata.create_all(engine)
-    with Session(engine) as s:
-        load(s, today=TODAY)
-        yield s
+from tests.conftest import TODAY
 
 
 def test_row_counts(session):
